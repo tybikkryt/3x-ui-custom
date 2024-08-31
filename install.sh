@@ -268,7 +268,7 @@ randomShortId() {
     for length in "${lengths[@]}"; do
         shortId=""
         for ((i=0; i<length; i++)); do
-            shortId+="${seq:RANDOM%62:1}"
+            shortId+="${seq:RANDOM%36:1}"
         done
         shortIds+=("$shortId")
     done
