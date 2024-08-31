@@ -235,6 +235,60 @@ x-ui restart
 username=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')
 password=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')
 webBasePath=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')
+
+while [[ "$(curl -k -b cookie -c cookie "https://localhost:2053${webBasePath}server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest" | jq -r ".success")" == "false" ]]; do
+	curl -k -b cookie -c cookie "https://localhost:2053${webBasePath}login" -d "username=${username}&password=${password}"
+done
+
+response=$(curl -k -b cookie -c cookie "https://localhost:2053${webBasePath}server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
+privateKey=$(echo $response | jq -r ".obj.privateKey")
+publicKey=$(echo $response | jq -r ".obj.publicKey")
+
+randomUUID() {
+    local uuid="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
+    for (( i=0; i<${#uuid}; i++ )); do
+        case "${uuid:i:1}" in
+            x) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 16)))${uuid:i + 1}" ;;
+            y) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 4 + 8)))${uuid:i + 1}" ;;
+        esac
+    done
+    echo "$uuid"
+}
+
+randomShortId() {
+    lengths=(2 4 6 8 10 12 14 16)
+    for ((i=${#lengths[@]}-1; i>0; i--)); do
+        j=$((RANDOM % (i + 1)))
+        temp=${lengths[i]}
+        lengths[i]=${lengths[j]}
+        lengths[j]=$temp
+    done
+    shortIds=()
+    seq="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for length in "${lengths[@]}"; do
+        shortId=""
+        for ((i=0; i<length; i++)); do
+            shortId+="${seq:RANDOM%62:1}"
+        done
+        shortIds+=("$shortId")
+    done
+
+    # Форматируем результат как JSON и кодируем в URL
+    jsonOutput=$(printf '%s\n' "${shortIds[@]}" | jq -R . | jq -s .)
+    encodedOutput=$(printf '%s' "$jsonOutput" | jq -s -R @uri)
+
+    # Убираем кавычки в начале и конце
+    echo "$encodedOutput" | sed 's/^"\(.*\)"$/\1/' | sed 's/%20/%20%20%20/g' | sed 's/%5D/%20%20%20%20/g'
+}
+
+randomSubId() {
+	tr -dc 'a-z0-9' < /dev/urandom | head -c 16
+}
+
+read -p "Enter server name (Ex: RU-1): " remark
+
+curl https://localhost:2053${webBasePath}panel/inbound/add -b cookie -d "up=0&down=0&total=0&remark=${remark}&enable=true&expiryTime=0&listen=&port=443&protocol=vless&settings=%7B%0A%20%20%22clients%22%3A%20%5B%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%22id%22%3A%20%22$(randomUUID)%22%2C%0A%20%20%20%20%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22email%22%3A%20%22GENESIS%22%2C%0A%20%20%20%20%20%20%22limitIp%22%3A%200%2C%0A%20%20%20%20%20%20%22totalGB%22%3A%200%2C%0A%20%20%20%20%20%20%22expiryTime%22%3A%200%2C%0A%20%20%20%20%20%20%22enable%22%3A%20false%2C%0A%20%20%20%20%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%20%20%20%20%22reset%22%3A%200%0A%20%20%20%20%7D%0A%20%20%5D%2C%0A%20%20%22decryption%22%3A%20%22none%22%2C%0A%20%20%22fallbacks%22%3A%20%5B%5D%0A%7D&streamSettings=%7B%0A%20%20%22network%22%3A%20%22tcp%22%2C%0A%20%20%22security%22%3A%20%22reality%22%2C%0A%20%20%22externalProxy%22%3A%20%5B%5D%2C%0A%20%20%22realitySettings%22%3A%20%7B%0A%20%20%20%20%22show%22%3A%20false%2C%0A%20%20%20%20%22xver%22%3A%200%2C%0A%20%20%20%20%22dest%22%3A%20%22cloudflare.com%3A443%22%2C%0A%20%20%20%20%22serverNames%22%3A%20%5B%0A%20%20%20%20%20%20%22cloudflare.com%22%2C%0A%20%20%20%20%20%20%22www.cloudflare.com%22%0A%20%20%20%20%5D%2C%0A%20%20%20%20%22privateKey%22%3A%20%22${privateKey}%22%2C%0A%20%20%20%20%22minClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxTimediff%22%3A%200%2C%0A%20%20%20%20%22shortIds%22%3A%20$(randomShortId)%5D%2C%0A%20%20%20%20%22settings%22%3A%20%7B%0A%20%20%20%20%20%20%22publicKey%22%3A%20%22${publicKey}%22%2C%0A%20%20%20%20%20%20%22fingerprint%22%3A%20%22random%22%2C%0A%20%20%20%20%20%20%22serverName%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22spiderX%22%3A%20%22%2F%22%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22tcpSettings%22%3A%20%7B%0A%20%20%20%20%22acceptProxyProtocol%22%3A%20false%2C%0A%20%20%20%20%22header%22%3A%20%7B%0A%20%20%20%20%20%20%22type%22%3A%20%22none%22%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&sniffing=%7B%0A%20%20%22enabled%22%3A%20true%2C%0A%20%20%22destOverride%22%3A%20%5B%0A%20%20%20%20%22http%22%2C%0A%20%20%20%20%22tls%22%2C%0A%20%20%20%20%22quic%22%2C%0A%20%20%20%20%22fakedns%22%0A%20%20%5D%2C%0A%20%20%22metadataOnly%22%3A%20false%2C%0A%20%20%22routeOnly%22%3A%20false%0A%7D" -k
+
 echo -e "${green}URL: https://$(hostname -i):2053${webBasePath}${plain}"
 echo -e "${green}Username: ${username}${plain}"
 echo -e "${green}Password: ${password}${plain}"
