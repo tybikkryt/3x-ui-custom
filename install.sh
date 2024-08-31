@@ -231,4 +231,4 @@ openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/priva
 /usr/local/x-ui/x-ui setting -webCertKey /etc/ssl/private/private.key
 /usr/local/x-ui/x-ui setting -webCert /etc/ssl/certs/public.key
 x-ui restart
-x-ui setting -show
+/usr/local/x-ui/x-ui setting -show
