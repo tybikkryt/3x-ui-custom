@@ -264,7 +264,7 @@ randomShortId() {
         lengths[j]=$temp
     done
     shortIds=()
-    seq="0123456789abcdefghijklmnopqrstuvwxyz"
+    seq="0123456789abcdef"
     for length in "${lengths[@]}"; do
         shortId=""
         for ((i=0; i<length; i++)); do
