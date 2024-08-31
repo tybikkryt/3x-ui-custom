@@ -226,9 +226,10 @@ echo -e "${green}Running...${plain}"
 install_base
 install_x-ui $1
 
-apt-get install openssl
+apt-get install sqlite3 openssl
 openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
-/usr/local/x-ui/x-ui setting -webCertKey /etc/ssl/private/private.key
-/usr/local/x-ui/x-ui setting -webCert /etc/ssl/certs/public.key
+sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings VALUES (%d, 'webKeyFile', '/etc/ssl/private/private.key'); INSERT INTO settings VALUES (%d, 'webCertFile', '/etc/ssl/certs/public.key');"
 x-ui restart
-/usr/local/x-ui/x-ui setting -show
+echo -e "${green}URL: https://$(hostname -i):2053$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')${plain}"
+echo -e "${green}Username: $(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')${plain}"
+echo -e "${green}Password: $(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')${plain}"
