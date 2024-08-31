@@ -131,8 +131,8 @@ gen_random_string() {
 config_after_install() {
     echo -e "${yellow}Install/update finished! For security it's recommended to modify panel settings ${plain}"
     if [[ ! -f "/etc/x-ui/x-ui.db" ]]; then
-        local usernameTemp=$(head -c 6 /dev/urandom | base64)
-        local passwordTemp=$(head -c 6 /dev/urandom | base64)
+        local usernameTemp=$(gen_random_string 10)
+        local passwordTemp=$(gen_random_string 10)
         local webBasePathTemp=$(gen_random_string 10)
         /usr/local/x-ui/x-ui setting -username ${usernameTemp} -password ${passwordTemp} -webBasePath ${webBasePathTemp}
         echo -e "This is a fresh installation, will generate random login info for security concerns:"
@@ -226,10 +226,9 @@ echo -e "${green}Running...${plain}"
 install_base
 install_x-ui $1
 
-openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.pem -days 3650 -subj "/CN=APP"
-apt-get install sqlite3
-sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings (id, key, value) VALUES (3, \"webCertFile\", \"/etc/ssl/certs/public.pem\"); INSERT INTO settings (id, key, value) VALUES (4, \"webKeyFile\", \"/etc/ssl/private/private.key\");"
+apt-get install openssl
+openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
+/usr/local/x-ui/x-ui setting -webCertKey /etc/ssl/private/private.key
+/usr/local/x-ui/x-ui setting -webCert /etc/ssl/certs/public.key
 x-ui restart
-(echo "URL: " && echo https:// && hostname -i && echo :2053 && sqlite3 /etc/x-ui/x-ui.db "SELECT value FROM settings WHERE key = 'webBasePath';")| tr -d '\n' > url && echo >> url && cat url
-echo -n "Username: " && sqlite3 /etc/x-ui/x-ui.db "SELECT username FROM users;"
-echo -n "Password: " && sqlite3 /etc/x-ui/x-ui.db "SELECT password FROM users;"
+x-ui setting -show
