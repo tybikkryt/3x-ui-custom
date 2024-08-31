@@ -228,8 +228,8 @@ install_x-ui $1
 
 apt-get install sqlite3 openssl
 openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
-local next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
-local second_id=$((next_id + 1))
+next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
+second_id=$((next_id + 1))
 sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings VALUES ($(next_id), 'webKeyFile', '/etc/ssl/private/private.key'); INSERT INTO settings VALUES ($(second_id), 'webCertFile', '/etc/ssl/certs/public.key');"
 x-ui restart
 echo -e "${green}URL: https://$(hostname -i):2053$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')${plain}"
