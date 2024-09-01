@@ -295,3 +295,4 @@ echo
 echo -e "${green}URL: https://$(hostname -i):2053${webBasePath}${plain}"
 echo -e "${green}Username: ${username}${plain}"
 echo -e "${green}Password: ${password}${plain}"
+echo "v1"
