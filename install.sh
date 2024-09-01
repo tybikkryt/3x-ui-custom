@@ -234,7 +234,7 @@ systemctl enable apache2
 
 mkdir /root/api
 
-cat << 'EOF' | sudo tee api/getClient.sh > /dev/null
+cat << 'EOF' | sudo tee /root/api/getClient.sh > /dev/null
 #!/bin/bash
 echo "Content-type: application/json"
 echo ""
@@ -249,7 +249,7 @@ fi
 echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=cloudflare.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
 EOF
 
-chmod +x api/test.sh
+chmod +x /root/api/getClient.sh
 
 echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
 
@@ -345,4 +345,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v1.8"
+echo "v1.9"
