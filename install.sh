@@ -243,6 +243,8 @@ done
 response=$(curl -k -b cookie -c cookie "https://localhost:2053${webBasePath}server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
 echo $(echo $response | jq -r ".obj.privateKey") | tee privateKey
 echo $(echo $response | jq -r ".obj.publicKey") > publicKey
+echo $(pwd)
+echo $(ls)
 
 cat << 'EOF' | sudo tee /usr/bin/randomUUID > /dev/null
 #!/bin/bash
