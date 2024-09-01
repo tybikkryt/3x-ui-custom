@@ -245,8 +245,6 @@ chmod +x api/test.sh
 
 echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
 
-systemctl restart apache2
-
 a2enmod cgi
 
 echo '<VirtualHost *:80>
@@ -275,11 +273,12 @@ x-ui restart
 username=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')
 password=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')
 webBasePath=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')
-
+echo ${username} > username
+echo ${password} > password
 echo ${webBasePath} > webBasePath
 
 while [[ "$(curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest" | jq -r ".success")" == "false" ]]; do
-	curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=${username}&password=${password}"
+	curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=${password}"
 done
 
 response=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
@@ -336,6 +335,6 @@ curl https://localhost:2053$(cat webBasePath)panel/inbound/add -b cookie -d "up=
 
 echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
-echo -e "${green}Username: ${username}${plain}"
+echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: ${password}${plain}"
-echo "v1.6"
+echo "v1.7"
