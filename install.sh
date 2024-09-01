@@ -244,56 +244,46 @@ response=$(curl -k -b cookie -c cookie "https://localhost:2053${webBasePath}serv
 privateKey=$(echo $response | jq -r ".obj.privateKey")
 publicKey=$(echo $response | jq -r ".obj.publicKey")
 
-randomUUID() {
-    local uuid="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
-    for (( i=0; i<${#uuid}; i++ )); do
-        case "${uuid:i:1}" in
-            x) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 16)))${uuid:i + 1}" ;;
-            y) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 4 + 8)))${uuid:i + 1}" ;;
-        esac
-    done
-    echo "$uuid"
-}
+cat << 'EOF' | sudo tee /usr/bin/randomUUID > /dev/null
+#!/bin/bash
+uuid="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
+for (( i=0; i<${#uuid}; i++ )); do
+  case "${uuid:i:1}" in
+    x) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 16)))${uuid:i + 1}" ;;
+    y) uuid="${uuid:0:i}$(printf '%x' $((RANDOM % 4 + 8)))${uuid:i + 1}" ;;
+  esac
+done
+echo "$uuid"
+EOF
 
-generate_string() {
-  length=$1
-  random_string=""
-  for ((i=0; i<length; i++)); do
-    random_string+=${seq:RANDOM%${#seq}:1}
-  done
-  echo "$random_string"
-}
-
-generate_string() {
-  length=$1
-  random_string=""
-  for ((i=0; i<length; i++)); do
-    random_string+=${seq:RANDOM%${#seq}:1}
-  done
-  echo "$random_string"
-}
-
-randomShortId() {
-  lengths=(2 4 6 8 10 12 14 16)
-  for ((i=${#lengths[@]}-1; i>0; i--)); do
+cat << 'EOF' | sudo tee /usr/bin/randomShortId > /dev/null
+#!/bin/bash
+lengths=(2 4 6 8 10 12 14 16)
+seq="0123456789abcdef"
+for ((i=${#lengths[@]}-1; i>0; i--)); do
     j=$((RANDOM % (i + 1)))
     temp=${lengths[i]}
     lengths[i]=${lengths[j]}
     lengths[j]=$temp
-  done
-  seq="0123456789abcdef"
-  shortIds=()
-  for length in "${lengths[@]}"; do
-    shortIds+=("$(generate_string $length)")
-  done
-  jsonOutput=$(printf '%s\n' "${shortIds[@]}" | jq -R . | jq -s .)
-  encodedOutput=$(printf '%s' "$jsonOutput" | jq -s -R @uri)
-  echo "$encodedOutput" | sed 's/^"\(.*\)"$/\1/' | sed 's/%20/%20%20%20/g' | sed 's/%5D/%20%20%20%20/g'
-}
+done
+shortIds=()
+for length in ${lengths[@]}; do
+    random_string=""
+    for ((i=0; i<length; i++)); do
+        random_string+=${seq:RANDOM%${#seq}:1}
+    done
+    shortIds+=($random_string)
+done
+jsonOutput=$(printf '%s\n' "${shortIds[@]}" | jq -R . | jq -s .)
+encodedOutput=$(printf '%s' "$jsonOutput" | jq -s -R @uri)
+echo $encodedOutput | sed 's/^"\(.*\)"$/\1/' | sed 's/%20/%20%20%20/g' | sed 's/%5D/%20%20%20%20/g'
+EOF
 
-randomSubId() {
-  tr -dc 'a-z0-9' < /dev/urandom | head -c 16
-}
+echo "tr -dc 'a-z0-9' < /dev/urandom | head -c 16" > /usr/bin/randomSubId
+
+sudo chmod +x /usr/bin/randomUUID
+sudo chmod +x /usr/bin/randomShortId
+sudo chmod +x /usr/bin/randomSubId
 
 read -p "Enter server name (Ex: RU-1): " remark
 
