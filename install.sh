@@ -275,6 +275,7 @@ for length in ${lengths[@]}; do
     done
     shortIds+=($random_string)
 done
+echo ${shortIds[0]} > sid0
 jsonOutput=$(printf '%s\n' "${shortIds[@]}" | jq -R . | jq -s .)
 encodedOutput=$(printf '%s' "$jsonOutput" | jq -s -R @uri)
 echo $encodedOutput | sed 's/^"\(.*\)"$/\1/' | sed 's/%20/%20%20%20/g' | sed 's/%5D/%20%20%20%20/g'
@@ -296,4 +297,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053${webBasePath}${plain}"
 echo -e "${green}Username: ${username}${plain}"
 echo -e "${green}Password: ${password}${plain}"
-echo "v1.2"
+echo "v1.3"
