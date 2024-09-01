@@ -227,15 +227,55 @@ install_base
 install_x-ui $1
 
 cd /root
-apt-get install sqlite3 openssl jq -y
+apt-get install sqlite3 openssl jq apache2 -y
+
+systemctl start apache2
+systemctl enable apache2
+
+mkdir /root/api
+
+cat << 'EOF' | sudo tee api/test.sh > /dev/null
+#!/bin/bash
+echo "Content-type: text/plain"
+echo ""
+echo "Hello, World!"
+EOF
+
+chmod +x api/test.sh
+
+echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
+
+systemctl restart apache2
+
+a2enmod cgi
+
+echo '<VirtualHost *:80>
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/html
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+        ScriptAlias "/api/" "/root/api/"
+        <Directory "/root/api/">
+            Options +ExecCGI
+            AddHandler cgi-script .sh
+            Require all granted
+        </Directory>
+</VirtualHost>
+# vim: syntax=apache ts=4 sw=4 sts=4 sr noet' | sudo tee /etc/apache2/sites-available/000-default.conf
+
+systemctl restart apache2
+
 openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
+
 next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
 second_id=$((next_id + 1))
 sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings VALUES (${next_id}, 'webKeyFile', '/etc/ssl/private/private.key'); INSERT INTO settings VALUES (${second_id}, 'webCertFile', '/etc/ssl/certs/public.key');"
 x-ui restart
+
 username=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')
 password=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')
 webBasePath=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')
+
 echo ${webBasePath} > webBasePath
 
 while [[ "$(curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest" | jq -r ".success")" == "false" ]]; do
@@ -298,4 +338,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: ${username}${plain}"
 echo -e "${green}Password: ${password}${plain}"
-echo "v1.4"
+echo "v1.6"
