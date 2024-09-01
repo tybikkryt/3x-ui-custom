@@ -226,6 +226,7 @@ echo -e "${green}Running...${plain}"
 install_base
 install_x-ui $1
 
+cd /root
 apt-get install sqlite3 openssl jq -y
 openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
 next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
@@ -295,4 +296,4 @@ echo
 echo -e "${green}URL: https://$(hostname -i):2053${webBasePath}${plain}"
 echo -e "${green}Username: ${username}${plain}"
 echo -e "${green}Password: ${password}${plain}"
-echo "v1"
+echo "v1.1"
