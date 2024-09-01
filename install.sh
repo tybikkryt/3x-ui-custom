@@ -234,11 +234,19 @@ systemctl enable apache2
 
 mkdir /root/api
 
-cat << 'EOF' | sudo tee api/test.sh > /dev/null
+cat << 'EOF' | sudo tee api/getClient.sh > /dev/null
 #!/bin/bash
-echo "Content-type: text/plain"
+echo "Content-type: application/json"
 echo ""
-echo "Hello, World!"
+email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
+if [[ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]]; then
+	uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
+else
+	uuid=$(randomUUID)
+	curl -k -b /root/cookie -c /root/cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > /dev/null
+	curl -k -b /root/cookie -c /root/cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%200%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > /dev/null
+fi
+echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=cloudflare.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
 EOF
 
 chmod +x api/test.sh
@@ -278,7 +286,7 @@ echo ${password} > password
 echo ${webBasePath} > webBasePath
 
 while [[ "$(curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest" | jq -r ".success")" == "false" ]]; do
-	curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=${password}"
+	curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
 done
 
 response=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
@@ -336,5 +344,5 @@ curl https://localhost:2053$(cat webBasePath)panel/inbound/add -b cookie -d "up=
 echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
-echo -e "${green}Password: ${password}${plain}"
-echo "v1.7"
+echo -e "${green}Password: $(cat password)${plain}"
+echo "v1.8"
