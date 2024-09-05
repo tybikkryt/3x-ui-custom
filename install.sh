@@ -233,23 +233,30 @@ systemctl start apache2
 systemctl enable apache2
 
 mkdir /root/api
+chown www-data:www-data api
 
-cat << 'EOF' | sudo tee /root/api/getClient.sh > /dev/null
+cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
 #!/bin/bash
-echo "Content-type: application/json"
+echo "Content-type: text/plain"
 echo ""
 email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
-if [[ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]]; then
-	uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
+password=$(echo "$QUERY_STRING" | sed -n 's/^.*password=\([^&]*\).*$/\1/p')
+passwordHash=$(echo -n "$password" | sha256sum | awk '{print $1}')
+if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db46431cc43" ]; then
+    if [ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]; then
+        uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
+    else
+        uuid=$(randomUUID)
+        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > login.txt
+        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%200%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > addClient.txt
+    fi
+    echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=cloudflare.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
 else
-	uuid=$(randomUUID)
-	curl -k -b /root/cookie -c /root/cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > /dev/null
-	curl -k -b /root/cookie -c /root/cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%200%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > /dev/null
+    echo "lol"
 fi
-echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=cloudflare.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
 EOF
 
-chmod +x /root/api/getClient.sh
+chmod +x /root/api/getClient
 
 echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
 
@@ -345,4 +352,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v1.9"
+echo "v2.0"
