@@ -270,7 +270,6 @@ echo '<VirtualHost *:80>
         ScriptAlias "/api/" "/root/api/"
         <Directory "/root/api/">
             Options +ExecCGI
-            AddHandler cgi-script .sh
             Require all granted
         </Directory>
 </VirtualHost>
@@ -352,4 +351,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v2.0"
+echo "v2.1"
