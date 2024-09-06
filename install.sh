@@ -235,9 +235,9 @@ systemctl enable apache2
 mkdir /root/api
 chown www-data:www-data api
 
-cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
+cat << 'EOL' | sudo tee /root/api/getClient > /dev/null
 #!/bin/bash
-echo "Content-type: text/plain"
+echo "Content-type: application/json"
 echo ""
 email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
 password=$(echo "$QUERY_STRING" | sed -n 's/^.*password=\([^&]*\).*$/\1/p')
@@ -248,12 +248,15 @@ if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db
     else
         uuid=$(randomUUID)
         curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > login.txt
-        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%200%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > addClient.txt
+        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22xtls-rprx-vision%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%200%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > addClient.txt
     fi
-    echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=cloudflare.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
+    config="vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=google.com&sid=$(cat /root/sid0)&spx=%2F#$(cat /root/remark)"
 else
-    echo "lol"
+    config="bruh"
 fi
+cat <<EOL
+{"status": "success", "config": "${config}"}
+EOL
 EOF
 
 chmod +x /root/api/getClient
@@ -291,13 +294,10 @@ echo ${username} > username
 echo ${password} > password
 echo ${webBasePath} > webBasePath
 
-while [[ "$(curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest" | jq -r ".success")" == "false" ]]; do
-	curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
-done
-
-response=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
-echo $(echo $response | jq -r ".obj.privateKey") > privateKey
-echo $(echo $response | jq -r ".obj.publicKey") > publicKey
+curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
+keys=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
+echo $(echo $keys| jq -r ".obj.privateKey") > privateKey
+echo $(echo $keys| jq -r ".obj.publicKey") > publicKey
 
 cat << 'EOF' | sudo tee /usr/bin/randomUUID > /dev/null
 #!/bin/bash
@@ -341,14 +341,14 @@ sudo chmod +x /usr/bin/randomUUID
 sudo chmod +x /usr/bin/randomShortId
 sudo chmod +x /usr/bin/randomSubId
 
-read -p "Enter server name (Ex: RU-1): " remark
+read -p "Enter server name (Ex: DE-1): " remark
 
 echo "$remark" > remark
 
-curl https://localhost:2053$(cat webBasePath)panel/inbound/add -b cookie -d "up=0&down=0&total=0&remark=${remark}&enable=true&expiryTime=0&listen=&port=443&protocol=vless&settings=%7B%0A%20%20%22clients%22%3A%20%5B%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%22id%22%3A%20%22$(randomUUID)%22%2C%0A%20%20%20%20%20%20%22flow%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22email%22%3A%20%22GENESIS%22%2C%0A%20%20%20%20%20%20%22limitIp%22%3A%200%2C%0A%20%20%20%20%20%20%22totalGB%22%3A%200%2C%0A%20%20%20%20%20%20%22expiryTime%22%3A%200%2C%0A%20%20%20%20%20%20%22enable%22%3A%20false%2C%0A%20%20%20%20%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%20%20%20%20%22reset%22%3A%200%0A%20%20%20%20%7D%0A%20%20%5D%2C%0A%20%20%22decryption%22%3A%20%22none%22%2C%0A%20%20%22fallbacks%22%3A%20%5B%5D%0A%7D&streamSettings=%7B%0A%20%20%22network%22%3A%20%22tcp%22%2C%0A%20%20%22security%22%3A%20%22reality%22%2C%0A%20%20%22externalProxy%22%3A%20%5B%5D%2C%0A%20%20%22realitySettings%22%3A%20%7B%0A%20%20%20%20%22show%22%3A%20false%2C%0A%20%20%20%20%22xver%22%3A%200%2C%0A%20%20%20%20%22dest%22%3A%20%22cloudflare.com%3A443%22%2C%0A%20%20%20%20%22serverNames%22%3A%20%5B%0A%20%20%20%20%20%20%22cloudflare.com%22%2C%0A%20%20%20%20%20%20%22www.cloudflare.com%22%0A%20%20%20%20%5D%2C%0A%20%20%20%20%22privateKey%22%3A%20%22$(cat privateKey)%22%2C%0A%20%20%20%20%22minClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxTimediff%22%3A%200%2C%0A%20%20%20%20%22shortIds%22%3A%20$(randomShortId)%5D%2C%0A%20%20%20%20%22settings%22%3A%20%7B%0A%20%20%20%20%20%20%22publicKey%22%3A%20%22$(cat publicKey)%22%2C%0A%20%20%20%20%20%20%22fingerprint%22%3A%20%22random%22%2C%0A%20%20%20%20%20%20%22serverName%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22spiderX%22%3A%20%22%2F%22%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22tcpSettings%22%3A%20%7B%0A%20%20%20%20%22acceptProxyProtocol%22%3A%20false%2C%0A%20%20%20%20%22header%22%3A%20%7B%0A%20%20%20%20%20%20%22type%22%3A%20%22none%22%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&sniffing=%7B%0A%20%20%22enabled%22%3A%20true%2C%0A%20%20%22destOverride%22%3A%20%5B%0A%20%20%20%20%22http%22%2C%0A%20%20%20%20%22tls%22%2C%0A%20%20%20%20%22quic%22%2C%0A%20%20%20%20%22fakedns%22%0A%20%20%5D%2C%0A%20%20%22metadataOnly%22%3A%20false%2C%0A%20%20%22routeOnly%22%3A%20false%0A%7D" -k
+curl https://localhost:2053$(cat webBasePath)panel/inbound/add -b cookie -d "up=0&down=0&total=0&remark=${remark}&enable=true&expiryTime=0&listen=&port=443&protocol=vless&settings=%7B%0A%20%20%22clients%22%3A%20%5B%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%22id%22%3A%20%22$(randomUUID)%22%2C%0A%20%20%20%20%20%20%22flow%22%3A%20%22xtls-rprx-vision%22%2C%0A%20%20%20%20%20%20%22email%22%3A%20%22GENESIS%22%2C%0A%20%20%20%20%20%20%22limitIp%22%3A%200%2C%0A%20%20%20%20%20%20%22totalGB%22%3A%200%2C%0A%20%20%20%20%20%20%22expiryTime%22%3A%200%2C%0A%20%20%20%20%20%20%22enable%22%3A%20false%2C%0A%20%20%20%20%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%20%20%20%20%22reset%22%3A%200%0A%20%20%20%20%7D%0A%20%20%5D%2C%0A%20%20%22decryption%22%3A%20%22none%22%2C%0A%20%20%22fallbacks%22%3A%20%5B%5D%0A%7D&streamSettings=%7B%0A%20%20%22network%22%3A%20%22tcp%22%2C%0A%20%20%22security%22%3A%20%22reality%22%2C%0A%20%20%22externalProxy%22%3A%20%5B%5D%2C%0A%20%20%22realitySettings%22%3A%20%7B%0A%20%20%20%20%22show%22%3A%20false%2C%0A%20%20%20%20%22xver%22%3A%200%2C%0A%20%20%20%20%22dest%22%3A%20%22google.com%3A443%22%2C%0A%20%20%20%20%22serverNames%22%3A%20%5B%0A%20%20%20%20%20%20%22google.com%22%2C%0A%20%20%20%20%20%20%22www.google.com%22%0A%20%20%20%20%5D%2C%0A%20%20%20%20%22privateKey%22%3A%20%22$(cat privateKey)%22%2C%0A%20%20%20%20%22minClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxClient%22%3A%20%22%22%2C%0A%20%20%20%20%22maxTimediff%22%3A%200%2C%0A%20%20%20%20%22shortIds%22%3A%20$(randomShortId)%5D%2C%0A%20%20%20%20%22settings%22%3A%20%7B%0A%20%20%20%20%20%20%22publicKey%22%3A%20%22$(cat publicKey)%22%2C%0A%20%20%20%20%20%20%22fingerprint%22%3A%20%22random%22%2C%0A%20%20%20%20%20%20%22serverName%22%3A%20%22%22%2C%0A%20%20%20%20%20%20%22spiderX%22%3A%20%22%2F%22%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22tcpSettings%22%3A%20%7B%0A%20%20%20%20%22acceptProxyProtocol%22%3A%20false%2C%0A%20%20%20%20%22header%22%3A%20%7B%0A%20%20%20%20%20%20%22type%22%3A%20%22none%22%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&sniffing=%7B%0A%20%20%22enabled%22%3A%20true%2C%0A%20%20%22destOverride%22%3A%20%5B%0A%20%20%20%20%22http%22%2C%0A%20%20%20%20%22tls%22%2C%0A%20%20%20%20%22quic%22%2C%0A%20%20%20%20%22fakedns%22%0A%20%20%5D%2C%0A%20%20%22metadataOnly%22%3A%20false%2C%0A%20%20%22routeOnly%22%3A%20false%0A%7D" -k
 
 echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v2.1"
+echo "v2.2"
