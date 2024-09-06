@@ -300,7 +300,7 @@ echo ${username} > username
 echo ${password} > password
 echo ${webBasePath} > webBasePath
 
-curl -k -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
+curl -k -s -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
 keys=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
 echo $(echo $keys| jq -r ".obj.privateKey") > privateKey
 echo $(echo $keys| jq -r ".obj.publicKey") > publicKey
