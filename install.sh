@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sudo apt update -y && sudo apt upgrade -y
+
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[0;33m'
@@ -359,4 +361,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v2.4"
+echo "v2.5"
