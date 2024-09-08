@@ -235,7 +235,6 @@ systemctl start apache2
 systemctl enable apache2
 
 mkdir /root/api
-chown www-data:www-data api
 
 cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
 #!/bin/bash
@@ -268,7 +267,10 @@ cat <<EOL
 EOL
 EOF
 
+chown www-data:www-data api
+chown www-data:www-data /root/api/getClient
 chmod +x /root/api/getClient
+chmod +x /root
 
 echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
 
