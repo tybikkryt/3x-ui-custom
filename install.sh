@@ -234,46 +234,6 @@ apt-get install sqlite3 openssl jq apache2 -y
 systemctl start apache2
 systemctl enable apache2
 
-mkdir /root/api
-
-cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
-#!/bin/bash
-echo "Content-type: application/json"
-echo ""
-email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
-timestamp=$(echo "$QUERY_STRING" | sed -n 's/^.*timestamp=\([^&]*\).*$/\1/p')
-password=$(echo "$QUERY_STRING" | sed -n 's/^.*password=\([^&]*\).*$/\1/p')
-passwordHash=$(echo -n "$password" | sha256sum | awk '{print $1}')
-if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db46431cc43" ]; then
-    if [ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]; then
-        uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
-    else
-        uuid=$(randomUUID)
-        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > login.txt
-        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22xtls-rprx-vision%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%20${timestamp}%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > addClient.txt
-    fi
-    config=$(echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=google.com&sid=$(cat /root/sid0)&spx=%2F&flow=xtls-rprx-vision#$(cat /root/remark)" | base64)
-else
-    status="bruh"
-fi
-if [ ${email} == "" ]; then
-	status="lol"
-fi
-if [ ${timestamp} == "" ]; then
-	status="jk"
-fi
-cat <<EOL
-{"status": "${status}", "config": "${config}"}
-EOL
-EOF
-
-chown www-data:www-data api
-chown www-data:www-data /root/api/getClient
-chmod +x /root/api/getClient
-chmod +x /root
-
-echo "<img src='https://media1.tenor.com/m/c54YFecd2HMAAAAC/kitty-kitten.gif'>" > /var/www/html/index.html
-
 a2enmod cgi
 
 echo '<VirtualHost *:80>
@@ -281,6 +241,7 @@ echo '<VirtualHost *:80>
         DocumentRoot /var/www/html
         ErrorLog ${APACHE_LOG_DIR}/error.log
         CustomLog ${APACHE_LOG_DIR}/access.log combined
+		ErrorDocument 404 /index.html
         ScriptAlias "/api/" "/root/api/"
         <Directory "/root/api/">
             Options +ExecCGI
@@ -289,26 +250,37 @@ echo '<VirtualHost *:80>
 </VirtualHost>
 # vim: syntax=apache ts=4 sw=4 sts=4 sr noet' | sudo tee /etc/apache2/sites-available/000-default.conf
 
+touch /var/www/html/index.html
+
 systemctl restart apache2
 
-openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
+mkdir /root/api
 
-next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
-second_id=$((next_id + 1))
-sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings VALUES (${next_id}, 'webKeyFile', '/etc/ssl/private/private.key'); INSERT INTO settings VALUES (${second_id}, 'webCertFile', '/etc/ssl/certs/public.key');"
-x-ui restart
-
-username=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')
-password=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')
-webBasePath=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')
-echo ${username} > username
-echo ${password} > password
-echo ${webBasePath} > webBasePath
-
-curl -k -s -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
-keys=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
-echo $(echo $keys| jq -r ".obj.privateKey") > privateKey
-echo $(echo $keys| jq -r ".obj.publicKey") > publicKey
+cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
+#!/bin/bash
+password=$(echo "$QUERY_STRING" | sed -n 's/^.*password=\([^&]*\).*$/\1/p')
+passwordHash=$(echo -n "$password" | sha256sum | awk '{print $1}')
+if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db46431cc43" ]; then
+    echo "Content-type: application/json"
+    echo ""
+    email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
+    timestamp=$(echo "$QUERY_STRING" | sed -n 's/^.*timestamp=\([^&]*\).*$/\1/p')
+    if [ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]; then
+        uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
+    else
+        uuid=$(randomUUID)
+        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)login" -d "username=$(cat /root/username)&password=$(cat /root/password)" > login.txt
+        curl -k -b cookie -c cookie "https://localhost:2053$(cat /root/webBasePath)panel/inbound/addClient" -X "POST" -d "id=1&settings=%7B%22clients%22%3A%20%5B%7B%0A%20%20%22id%22%3A%20%22${uuid}%22%2C%0A%20%20%22flow%22%3A%20%22xtls-rprx-vision%22%2C%0A%20%20%22email%22%3A%20%22${email}%22%2C%0A%20%20%22limitIp%22%3A%200%2C%0A%20%20%22totalGB%22%3A%200%2C%0A%20%20%22expiryTime%22%3A%20${timestamp}%2C%0A%20%20%22enable%22%3A%20true%2C%0A%20%20%22tgId%22%3A%20%22%22%2C%0A%20%20%22subId%22%3A%20%22$(randomSubId)%22%2C%0A%20%20%22reset%22%3A%200%0A%7D%5D%7D" > addClient.txt
+    fi
+    config=$(echo "vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=google.com&sid=$(cat /root/sid0)&spx=%2F&flow=xtls-rprx-vision#$(cat /root/remark)" | base64)
+	cat <<EOL
+		{"status": "success", "config": "${config}"}
+	EOL
+else
+	echo "Status: 404 Not Found"
+	echo ""
+fi
+EOF
 
 cat << 'EOF' | sudo tee /usr/bin/randomUUID > /dev/null
 #!/bin/bash
@@ -348,9 +320,27 @@ EOF
 
 echo "tr -dc 'a-z0-9' < /dev/urandom | head -c 16" > /usr/bin/randomSubId
 
-sudo chmod +x /usr/bin/randomUUID
-sudo chmod +x /usr/bin/randomShortId
-sudo chmod +x /usr/bin/randomSubId
+chown www-data:www-data api /root/api/getClient
+chmod +x /root /root/api/getClient /usr/bin/randomUUID /usr/bin/randomShortId /usr/bin/randomSubId
+
+openssl req -x509 -newkey rsa:4096 -nodes -sha256 -keyout /etc/ssl/private/private.key -out /etc/ssl/certs/public.key -days 3650 -subj "/CN=APP"
+
+next_id=$(($(sqlite3 /etc/x-ui/x-ui.db "SELECT IFNULL(MAX(id), 0) FROM settings;") + 1))
+second_id=$((next_id + 1))
+sqlite3 /etc/x-ui/x-ui.db "INSERT INTO settings VALUES (${next_id}, 'webKeyFile', '/etc/ssl/private/private.key'); INSERT INTO settings VALUES (${second_id}, 'webCertFile', '/etc/ssl/certs/public.key');"
+x-ui restart
+
+username=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT username FROM users')
+password=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT password FROM users')
+webBasePath=$(sqlite3 /etc/x-ui/x-ui.db 'SELECT value FROM settings WHERE key="webBasePath"')
+echo ${username} > username
+echo ${password} > password
+echo ${webBasePath} > webBasePath
+
+curl -k -s -b cookie -c cookie "https://localhost:2053$(cat webBasePath)login" -d "username=$(cat username)&password=$(cat password)"
+keys=$(curl -ks -b cookie -c cookie "https://localhost:2053$(cat webBasePath)server/getNewX25519Cert" -X "POST" -H "X-Requested-With: XMLHttpRequest")
+echo $(echo $keys| jq -r ".obj.privateKey") > privateKey
+echo $(echo $keys| jq -r ".obj.publicKey") > publicKey
 
 echo
 read -p "Enter server name (Ex: DE-1): " remark
@@ -363,4 +353,4 @@ echo
 echo -e "${green}URL: https://$(hostname -I | awk '{print $1}'):2053$(cat webBasePath)${plain}"
 echo -e "${green}Username: $(cat username)${plain}"
 echo -e "${green}Password: $(cat password)${plain}"
-echo "v2.5"
+echo "v2.7"
