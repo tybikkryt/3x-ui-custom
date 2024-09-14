@@ -241,9 +241,9 @@ cat << 'EOF' | sudo tee /root/api/getClient > /dev/null
 echo "Content-type: application/json"
 echo ""
 email=$(echo "$QUERY_STRING" | sed -n 's/^.*email=\([^&]*\).*$/\1/p')
+timestamp=$(echo "$QUERY_STRING" | sed -n 's/^.*timestamp=\([^&]*\).*$/\1/p')
 password=$(echo "$QUERY_STRING" | sed -n 's/^.*password=\([^&]*\).*$/\1/p')
 passwordHash=$(echo -n "$password" | sha256sum | awk '{print $1}')
-timestamp=$(echo "$QUERY_STRING" | sed -n 's/^.*timestamp=\([^&]*\).*$/\1/p')
 if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db46431cc43" ]; then
     if [ $(sqlite3 /etc/x-ui/x-ui.db "SELECT COUNT(*) FROM client_traffics WHERE email = '${email}'") == 1 ]; then
         uuid=$(sqlite3 /etc/x-ui/x-ui.db "SELECT settings FROM inbounds WHERE id = 1" | jq -r --arg var "$email" '.clients[] | select(.email == $var) | .id')
@@ -254,16 +254,16 @@ if [ ${passwordHash} == "e597e26004b4ea341695dd9e2cc5ce301d01fccdcdc066b513b60db
     fi
     config="vless://${uuid}@$(hostname -I | awk '{print $1}'):443?type=tcp&security=reality&pbk=$(cat /root/publicKey)&fp=random&sni=google.com&sid=$(cat /root/sid0)&spx=%2F&flow=xtls-rprx-vision#$(cat /root/remark)"
 else
-    config="bruh"
+    status="bruh"
 fi
 if [ ${email} == "" ]; then
-	config="lol"
+	status="lol"
 fi
 if [ ${timestamp} == "" ]; then
-	config="jk"
+	status="jk"
 fi
 cat <<EOL
-{"status": "success", "config": "${config}"}
+{"status": "${status}", "config": "${config}"}
 EOL
 EOF
 
